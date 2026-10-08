@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduExam Pro - Sistem Asesmen Digital Aman</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .no-select { user-select: none; -webkit-user-select: none; }
+        /* Transisi halus */
+        .fade-in { animation: fadeIn 0.25s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col no-select">
+
+    <!-- TOPBAR / HEADER -->
+    <header id="topbar" class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm hidden">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-600 text-white p-2 rounded-lg font-bold flex items-center justify-center w-9 h-9">
+                    <i class="fa-solid fa-[# graduation-cap] fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-slate-900 leading-none">EduExam Pro</h1>
+                    <span class="text-xs text-slate-500 font-medium">Sistem Asesmen Terintegrasi</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right hidden sm:block">
+                    <div id="user-display-name" class="text-sm font-semibold text-slate-800">Nama User</div>
+                    <div id="user-display-role" class="text-xs text-slate-500 capitalize">Role</div>
+                </div>
+                <button onclick="app.logout()" class="text-slate-500 hover:text-red-600 p-2 rounded-lg hover:bg-slate-100 transition" title="Keluar">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTAINER UTAMA -->
+    <main id="app-container" class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+        <!-- Dynamic Views Will Render Here -->
+    </main>
+
+    <!-- MODAL INTEGRITAS / PERINGATAN (EXAM MODE) -->
+    <div id="violation-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden fade-in">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl text-center border border-slate-100">
+            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">Peringatan Integritas!</h3>
+            <p id="violation-message" class="text-slate-600 text-sm mb-4">Terdeteksi aktivitas meninggalkan halaman ujian. Silakan kembali ke ujian.</p>
+            <div class="bg-slate-100 rounded-lg p-3 mb-6 text-sm flex justify-between items-center">
+                <span class="text-slate-500">Jumlah Pelanggaran:</span>
+                <span id="violation-count-badge" class="font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">1 / 3</span>
+            </div>
+            <button onclick="examEngine.resumeExam()" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl transition shadow-lg shadow-brand-500/20">
+                Kembali ke Ujian
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL UJIAN DITANGGUHKAN -->
+    <div id="suspended-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden fade-in">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl text-center border border-red-200">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">Ujian Ditangguhkan</h3>
+            <p class="text-slate-600 text-sm mb-6">Anda telah melebihi batas toleransi pelanggaran. Lembar ujian terkunci secara otomatis. Hubungi pengawas/guru untuk reset izin.</p>
+            
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left mb-6">
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">PIN Otorisasi Pengawas</label>
+                <input type="password" id="supervisor-pin-input" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 text-center text-lg tracking-widest font-mono" placeholder="••••••">
+                <div id="pin-error" class="text-red-500 text-xs mt-1 hidden">PIN Pengawas tidak valid!</div>
+            </div>
+
+            <button onclick="examEngine.unlockBySupervisor()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl transition shadow-lg shadow-red-500/20">
+                Buka Kunci Ujian
+            </button>
+        </div>
+    </div>
+
+    <!-- SCRIPT APLIKASI -->
+    <script>
+        /**
+         * SANITASI DATA (XSS PROTECTION)
+         */
+        const Security = {
+            sanitize(str) {
+                if (typeof str !== 'string') return str;
+                return str.replace(/[&<>"']/g, function(m) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+                });
+            }
+        };
+
+        /**
+         * STATE & DATABASE IN-MEMORY / LOCALSTORAGE
+         */
+        const DB = {
+            init() {
+                if (!localStorage.getItem('edu_users')) {
+                    const defaultUsers = [
+                        { username: 'guru', pin: '1234', role: 'guru', name: 'Bapak Ahmad, S.Pd.' },
+                        { username: 'siswa', pin: '1234', role: 'siswa', name: 'Budi Santoso' },
+                        { username: 'siswa2', pin: '1234', role: 'siswa', name: 'Siti Aminah' }
+                    ];
+                    localStorage.setItem('edu_users', JSON.stringify(defaultUsers));
+                }
+                if (!localStorage.getItem('edu_exams')) {
+                    const defaultExams = [{
+                        id: 'EXAM-101',
+                        code: 'MATH101',
+                        title: 'Ujian Akhir Semester Matematika',
+                        duration: 30, // menit
+                        maxViolations: 3,
+                        kkm: 75,
+                        active: true,
+                        questions: [
+                            { id: 1, type: 'pg', question: 'Berapakah hasil dari 15 x 12?', options: ['160', '170', '180', '190'], answer: '180', score: 25 },
+                            { id: 2, type: 'tf', question: 'Akar kuadrat dari 144 adalah 12.', options: ['Benar', 'Salah'], answer: 'Benar', score: 25 },
+                            { id: 3, type: 'isian', question: 'Ibu kota negara Indonesia saat ini adalah...', answer: 'Jakarta', score: 25 },
+                            { id: 4, type: 'uraian', question: 'Jelaskan rumus mencari luas lingkaran!', answer: 'Luas = π x r x r', score: 25 }
+                        ]
+                    }];
+                    localStorage.setItem('edu_exams', JSON.stringify(defaultExams));
+                }
+                if (!localStorage.getItem('edu_results')) {
+                    localStorage.setItem('edu_results', JSON.stringify([]));
+                }
+            },
+            getUsers() { return JSON.parse(localStorage.getItem('edu_users') || '[]'); },
+            getExams() { return JSON.parse(localStorage.getItem('edu_exams') || '[]'); },
+            saveExam(exam) {
+                const exams = this.getExams();
+                const idx = exams.findIndex(e => e.id === exam.id);
+                if (idx >= 0) exams[idx] = exam;
+                else exams.push(exam);
+                localStorage.setItem('edu_exams', JSON.stringify(exams));
+            },
+            getResults() { return JSON.parse(localStorage.getItem('edu_results') || '[]'); },
+            saveResult(result) {
+                const results = this.getResults();
+                const idx = results.findIndex(r => r.examId === result.examId && r.username === result.username);
+                if (idx >= 0) results[idx] = result;
+                else results.push(result);
+                localStorage.setItem('edu_results', JSON.stringify(results));
+            }
+        };
+
+        /**
+         * ROUTER & APLIKASI
+         */
+        const app = {
+            currentUser: null,
+            init() {
+                DB.init();
+                const savedUser = sessionStorage.getItem('edu_session');
+                if (savedUser) {
+                    this.currentUser = JSON.parse(savedUser);
+                    this.updateTopbar();
+                    if (this.currentUser.role === 'guru') this.renderTeacherDashboard();
+                    else this.renderStudentHome();
+                } else {
+                    this.renderLogin();
+                }
+            },
+            updateTopbar() {
+                const topbar = document.getElementById('topbar');
+                if (this.currentUser) {
+                    topbar.classList.remove('hidden');
+                    document.getElementById('user-display-name').textContent = Security.sanitize(this.currentUser.name);
+                    document.getElementById('user-display-role').textContent = Security.sanitize(this.currentUser.role);
+                } else {
+                    topbar.classList.add('hidden');
+                }
+            },
+            login(username, pin) {
+                const users = DB.getUsers();
+                const user = users.find(u => u.username === username && u.pin === pin);
+                if (user) {
+                    this.currentUser = user;
+                    sessionStorage.setItem('edu_session', JSON.stringify(user));
+                    this.updateTopbar();
+                    if (user.role === 'guru') this.renderTeacherDashboard();
+                    else this.renderStudentHome();
+                    return { success: true };
+                }
+                return { success: false, message: 'Username atau PIN tidak valid!' };
+            },
+            logout() {
+                this.currentUser = null;
+                sessionStorage.removeItem('edu_session');
+                this.updateTopbar();
+                this.renderLogin();
+            },
+
+            // VIEWS
+            renderLogin() {
+                const container = document.getElementById('app-container');
+                container.innerHTML = `
+                <div class="max-w-md mx-auto my-12 fade-in">
+                    <div class="bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+                        <div class="text-center mb-8">
+                            <div class="bg-brand-600 text-white w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold mx-auto mb-3 shadow-lg shadow-brand-500/30">
+                                <i class="fa-solid fa-graduation-cap"></i>
+                            </div>
+                            <h2 class="text-2xl font-bold text-slate-900">Masuk EduExam</h2>
+                            <p class="text-slate-500 text-sm mt-1">Platform Asesmen Digital Aman & Terpercaya</p>
+                        </div>
+                        <form id="login-form" class="space-y-4" onsubmit="event.preventDefault(); app.handleLogin();">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Username</label>
+                                <input type="text" id="login-username" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm" placeholder="Masukkan username" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">PIN / Password</label>
+                                <input type="password" id="login-pin" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm" placeholder="••••" required>
+                            </div>
+                            <div id="login-error" class="text-red-500 text-xs hidden"></div>
+                            <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-brand-500/20">
+                                Masuk Sistem
+                            </button>
+                        </form>
+                        <div class="mt-6 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
+                            Demo Login: <b>guru</b> (PIN: 1234) | <b>siswa</b> (PIN: 1234)
+                        </div>
+                    </div>
+                </div>`;
+            },
+            handleLogin() {
+                const u = document.getElementById('login-username').value;
+                const p = document.getElementById('login-pin').value;
+                const res = this.login(u, p);
+                if (!res.success) {
+                    const err = document.getElementById('login-error');
+                    err.textContent = res.message;
+                    err.classList.remove('hidden');
+                }
+            },
+
+            // SISWA HOME
+            renderStudentHome() {
+                const container = document.getElementById('app-container');
+                container.innerHTML = `
+                <div class="max-w-2xl mx-auto space-y-6 fade-in">
+                    <div class="bg-gradient-to-r from-brand-600 to-brand-700 text-white rounded-2xl p-6 shadow-lg">
+                        <h2 class="text-xl font-bold">Selamat Datang, ${Security.sanitize(this.currentUser.name)}</h2>
+                        <p class="text-brand-100 text-sm mt-1">Siapkan kode ujian yang diberikan oleh guru untuk memulai asesmen.</p>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                        <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fa-solid fa-key text-brand-600 mr-2"></i> Masukkan Kode Ujian
+                        </h3>
+                        <div class="flex gap-3">
+                            <input type="text" id="input-exam-code" class="flex-1 uppercase tracking-wider font-mono px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 font-bold text-lg" placeholder="Contoh: MATH101">
+                            <button onclick="app.validateExamCode()" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-3 rounded-xl transition">
+                                Verifikasi
+                            </button>
+                        </div>
+                        <div id="student-code-error" class="text-red-500 text-xs mt-2 hidden"></div>
+                    </div>
+                </div>`;
+            },
+
+            validateExamCode() {
+                const code = document.getElementById('input-exam-code').value.trim().toUpperCase();
+                const err = document.getElementById('student-code-error');
+                const exams = DB.getExams();
+                const exam = exams.find(e => e.code === code && e.active);
+
+                if (!exam) {
+                    err.textContent = 'Kode ujian tidak ditemukan atau ujian belum aktif!';
+                    err.classList.remove('hidden');
+                    return;
+                }
+
+                // Cek jika ujian sudah diselesaikan
+                const results = DB.getResults();
+                const existing = results.find(r => r.examId === exam.id && r.username === this.currentUser.username && r.status === 'Selesai');
+                if (existing) {
+                    err.textContent = 'Anda telah menyelesaikan ujian ini!';
+                    err.classList.remove('hidden');
+                    return;
+                }
+
+                this.renderInstructions(exam);
+            },
+
+            renderInstructions(exam) {
+                const container = document.getElementById('app-container');
+                container.innerHTML = `
+                <div class="max-w-3xl mx-auto bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 fade-in">
+                    <div class="border-b border-slate-100 pb-4 mb-6">
+                        <span class="bg-brand-100 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Petunjuk Asesmen</span>
+                        <h2 class="text-2xl font-bold text-slate-900 mt-2">${Security.sanitize(exam.title)}</h2>
+                        <div class="flex flex-wrap gap-4 text-xs text-slate-500 mt-3">
+                            <div><i class="fa-solid fa-clock text-slate-400 mr-1"></i> Durasi: <b>${exam.duration} Menit</b></div>
+                            <div><i class="fa-solid fa-list-check text-slate-400 mr-1"></i> Total Soal: <b>${exam.questions.length} Soal</b></div>
+                            <div><i class="fa-solid fa-shield-halved text-slate-400 mr-1"></i> Batas Pelanggaran: <b>${exam.maxViolations}x</b></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                        <h4 class="text-amber-800 font-bold text-sm mb-2 flex items-center">
+                            <i class="fa-solid fa-triangle-exclamation mr-2"></i> Peraturan Keamanan (Exam Mode)
+                        </h4>
+                        <ul class="text-xs text-amber-700 space-y-1.5 list-disc list-inside">
+                            <li>Ujian berjalan dalam mode **Layars Penuh (Fullscreen)**.</li>
+                            <li>Dilarang berpindah tab, meminimalkan browser, atau membuka aplikasi lain.</li>
+                            <li>Setiap tindakan mencurigakan akan dicatat sebagai **pelanggaran integritas**.</li>
+                            <li>Jika melewati batas ${exam.maxViolations}x pelanggaran, ujian akan otomatis **terkunci**.</li>
+                        </ul>
+                    </div>
+
+                    <button onclick="examEngine.startExam('${exam.id}')" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-brand-500/20 transition flex items-center justify-center">
+                        <i class="fa-solid fa-expand mr-2"></i> Masuk Mode Layar Penuh & Mulai Ujian
+                    </button>
+                </div>`;
+            },
+
+            // DASHBOARD GURU
+            renderTeacherDashboard() {
+                const exams = DB.getExams();
+                const container = document.getElementById('app-container');
+                
+                container.innerHTML = `
+                <div class="space-y-6 fade-in">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-900">Dashboard Pengelolaan Ujian</h2>
+                            <p class="text-sm text-slate-500">Kelola bank soal, pengaturan keamanan, dan lihat hasil audit siswa.</p>
+                        </div>
+                        <button onclick="app.renderCreateExamModal()" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition shadow-md flex items-center">
+                            <i class="fa-solid fa-plus mr-2"></i> Buat Ujian Baru
+                        </button>
+                    </div>
+
+                    <!-- DAFTAR UJIAN -->
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${exams.map(e => `
+                            <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="bg-slate-100 text-slate-700 font-mono text-xs font-bold px-2 py-1 rounded-md">${Security.sanitize(e.code)}</span>
+                                        <span class="${e.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'} text-xs font-semibold px-2 py-0.5 rounded-full">
+                                            ${e.active ? 'Aktif' : 'Nonaktif'}
+                                        </span>
+                                    </div>
+                                    <h3 class="font-bold text-slate-800 text-base mb-1">${Security.sanitize(e.title)}</h3>
+                                    <p class="text-xs text-slate-500 mb-4">${e.questions.length} Soal | Durasi: ${e.duration} m \vert{} Max Toleransi:${e.maxViolations}x</p>
+                                </div>
+                                <div class="border-t border-slate-100 pt-3 flex gap-2">
+                                    <button onclick="app.renderAuditLog('${e.id}')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 rounded-lg transition text-center">
+                                        <i class="fa-solid fa-chart-line mr-1"></i> Audit & Hasil
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            },
+
+            renderAuditLog(examId) {
+                const exam = DB.getExams().find(e => e.id === examId);
+                const results = DB.getResults().filter(r => r.examId === examId);
+                const container = document.getElementById('app-container');
+
+                container.innerHTML = `
+                <div class="space-y-6 fade-in">
+                    <div class="flex items-center space-x-4">
+                        <button onclick="app.renderTeacherDashboard()" class="text-slate-500 hover:text-slate-800">
+                            <i class="fa-solid fa-arrow-left text-lg"></i>
+                        </button>
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-900">Audit & Hasil: ${Security.sanitize(exam.title)}</h2>
+                            <p class="text-sm text-slate-500">Kode Ujian: <span class="font-mono font-bold">${exam.code}</span></p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 font-bold text-slate-800 text-sm">
+                            Rekapitulasi Pengerjaan & Audit Log Keamanan
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600">
+                                <thead class="bg-slate-50 text-slate-700 uppercase font-semibold border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-4">Siswa</th>
+                                        <th class="p-4">Nilai</th>
+                                        <th class="p-4">Status</th>
+                                        <th class="p-4">Jumlah Pelanggaran</th>
+                                        <th class="p-4">Detail Log Pelanggaran</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    ${results.length === 0 ? `<tr><td colspan="5" class="p-4 text-center text-slate-400">Belum ada siswa yang mengerjakan.</td></tr>` : ''}
+                                    ${results.map(r => `
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-4 font-semibold text-slate-800">${Security.sanitize(r.username)}</td>
+                                            <td class="p-4 font-bold text-sm ${r.score >= exam.kkm ? 'text-emerald-600' : 'text-red-600'}">${r.score} / 100</td>
+                                            <td class="p-4">
+                                                <span class="px-2 py-0.5 rounded-full font-medium ${r.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">
+                                                    ${r.status}
+                                                </span>
+                                            </td>
+                                            <td class="p-4 font-bold ${r.violations.length > 0 ? 'text-amber-600' : 'text-slate-400'}">
+                                                ${r.violations.length} Kali
+                                            </td>
+                                            <td class="p-4 text-slate-500">
+                                                ${r.violations.map(v => `<div class="font-mono text-[10px]">• [${v.timestamp}] ${Security.sanitize(v.reason)}</div>`).join('') || '-'}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            },
+
+            renderCreateExamModal() {
+                const code = 'EXAM-' + Math.floor(100 + Math.random() * 900);
+                const title = prompt("Masukkan Judul Ujian Baru:");
+                if (!title) return;
+
+                const newExam = {
+                    id: code,
+                    code: 'KODE' + Math.floor(100 + Math.random() * 900),
+                    title: title,
+                    duration: 45,
+                    maxViolations: 3,
+                    kkm: 70,
+                    active: true,
+                    questions: [
+                        { id: 1, type: 'pg', question: 'Soal pilihan ganda contoh?', options: ['Jawaban A', 'Jawaban B', 'Jawaban C', 'Jawaban D'], answer: 'Jawaban A', score: 100 }
+                    ]
+                };
+                DB.saveExam(newExam);
+                alert(`Ujian berhasil dibuat dengan Kode: ${newExam.code}`);
+                this.renderTeacherDashboard();
+            }
+        };
+
+        /**
+         * ENGINE UJIAN (EXAM MODE & INTEGRITY MONITOR)
+         */
+        const examEngine = {
+            currentExam: null,
+            answers: {},
+            violations: [],
+            timeLeft: 0,
+            timerInterval: null,
+            isExamActive: false,
+
+            startExam(examId) {
+                this.currentExam = DB.getExams().find(e => e.id === examId);
+                this.answers = JSON.parse(localStorage.getItem(`draft_${examId}_${app.currentUser.username}`) || '{}');
+                this.violations = [];
+                this.timeLeft = this.currentExam.duration * 60;
+                this.isExamActive = true;
+
+                // Masuk Fullscreen
+                this.requestFullscreen();
+
+                // Pasang Security Event Listeners
+                this.bindSecurityEvents();
+
+                // Jalankan Timer Sync
+                this.startTimer();
+
+                // Render UI Ujian
+                this.renderExamUI();
+            },
+
+            requestFullscreen() {
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            },
+
+            bindSecurityEvents() {
+                this.onVisibilityChange = () => {
+                    if (document.hidden && this.isExamActive) {
+                        this.registerViolation("Terdeteksi berpindah tab/membuka jendela lain");
+                    }
+                };
+                this.onBlur = () => {
+                    if (this.isExamActive) {
+                        this.registerViolation("Fokus layar hilang (Blur event)");
+                    }
+                };
+                this.onFullscreenChange = () => {
+                    if (!document.fullscreenElement && this.isExamActive) {
+                        this.registerViolation("Keluar dari mode layar penuh (Fullscreen Exit)");
+                    }
+                };
+
+                document.addEventListener("visibilitychange", this.onVisibilityChange);
+                window.addEventListener("blur", this.onBlur);
+                document.addEventListener("fullscreenchange", this.onFullscreenChange);
+
+                // Mencegah Klik Kanan & Shortcut
+                window.oncontextmenu = (e) => e.preventDefault();
+                window.onkeydown = (e) => {
+                    if (e.key === "F12" || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'c')) {
+                        e.preventDefault();
+                    }
+                };
+            },
+
+            unbindSecurityEvents() {
+                document.removeEventListener("visibilitychange", this.onVisibilityChange);
+                window.removeEventListener("blur", this.onBlur);
+                document.removeEventListener("fullscreenchange", this.onFullscreenChange);
+                window.oncontextmenu = null;
+                window.onkeydown = null;
+            },
+
+            registerViolation(reason) {
+                if (!this.isExamActive) return;
+
+                const timestamp = new Date().toLocaleTimeString();
+                this.violations.push({ timestamp, reason });
+
+                const modal = document.getElementById('violation-modal');
+                const countBadge = document.getElementById('violation-count-badge');
+                const msg = document.getElementById('violation-message');
+
+                countBadge.textContent = `${this.violations.length} / ${this.currentExam.maxViolations}`;
+                msg.textContent = `${reason}. Harap fokus pada pengerjaan ujian.`;
+
+                if (this.violations.length >= this.currentExam.maxViolations) {
+                    this.suspendExam();
+                } else {
+                    modal.classList.remove('hidden');
+                }
+            },
+
+            resumeExam() {
+                document.getElementById('violation-modal').classList.add('hidden');
+                this.requestFullscreen();
+            },
+
+            suspendExam() {
+                document.getElementById('violation-modal').classList.add('hidden');
+                document.getElementById('suspended-modal').classList.remove('hidden');
+            },
+
+            unlockBySupervisor() {
+                const pin = document.getElementById('supervisor-pin-input').value;
+                if (pin === '1234') { // Default Supervisor PIN
+                    document.getElementById('suspended-modal').classList.add('hidden');
+                    document.getElementById('supervisor-pin-input').value = '';
+                    document.getElementById('pin-error').classList.add('hidden');
+                    this.violations = []; // Reset statistik pelanggaran lokal setelah diawasi
+                    this.requestFullscreen();
+                } else {
+                    document.getElementById('pin-error').classList.remove('hidden');
+                }
+            },
+
+            startTimer() {
+                clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    if (this.timeLeft <= 0) {
+                        clearInterval(this.timerInterval);
+                        this.submitExam(true); // Auto-submit
+                    } else {
+                        this.timeLeft--;
+                        this.updateTimerDisplay();
+                    }
+                }, 1000);
+            },
+
+            updateTimerDisplay() {
+                const el = document.getElementById('exam-timer');
+                if (!el) return;
+                const m = Math.floor(this.timeLeft / 60).toString().padStart(2, '0');
+                const s = (this.timeLeft % 60).toString().padStart(2, '0');
+                el.textContent = `${m}:${s}`;
+            },
+
+            saveAnswer(qId, val) {
+                this.answers[qId] = val;
+                // Auto-save ke localStorage
+                localStorage.setItem(`draft_${this.currentExam.id}_${app.currentUser.username}`, JSON.stringify(this.answers));
+            },
+
+            renderExamUI() {
+                const container = document.getElementById('app-container');
+                container.innerHTML = `
+                <div class="space-y-6 fade-in">
+                    <!-- TIMER & HEADER -->
+                    <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex justify-between items-center sticky top-20 z-20">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">${Security.sanitize(this.currentExam.title)}</h3>
+                            <span class="text-xs text-slate-500">Exam Mode Aktif</span>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 text-red-600 font-mono font-bold px-4 py-2 rounded-xl text-lg flex items-center">
+                            <i class="fa-solid fa-stopwatch mr-2 text-sm"></i>
+                            <span id="exam-timer">00:00</span>
+                        </div>
+                    </div>
+
+                    <!-- DAFTAR SOAL -->
+                    <div class="space-y-4">
+                        ${this.currentExam.questions.map((q, idx) => `
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                                <div class="flex justify-between items-start">
+                                    <span class="bg-brand-100 text-brand-700 text-xs font-bold px-3 py-1 rounded-full">Soal No. ${idx + 1}</span>
+                                    <span class="text-xs font-semibold text-slate-400">Bobot: ${q.score} Pts</span>
+                                </div>
+                                <p class="text-slate-800 text-sm font-medium leading-relaxed">${Security.sanitize(q.question)}</p>
+
+                                ${this.renderInputByQuestionType(q)}
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- TOMBOL SELESAI -->
+                    <div class="pt-4">
+                        <button onclick="examEngine.confirmSubmit()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-600/20 transition text-center">
+                            Selesaikan & Kirim Jawaban
+                        </button>
+                    </div>
+                </div>`;
+            },
+
+            renderInputByQuestionType(q) {
+                const saved = this.answers[q.id] || '';
+                if (q.type === 'pg' || q.type === 'tf') {
+                    return `
+                    <div class="space-y-2 pt-2">
+                        ${q.options.map(opt => `
+                            <label class="flex items-center p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                <input type="radio" name="q_${q.id}" value="${Security.sanitize(opt)}" ${saved === opt ? 'checked' : ''} onchange="examEngine.saveAnswer(${q.id}, this.value)" class="w-4 h-4 text-brand-600 focus:ring-brand-500">
+                                <span class="ml-3 text-sm text-slate-700">${Security.sanitize(opt)}</span>
+                            </label>
+                        `).join('')}
+                    </div>`;
+                } else if (q.type === 'isian') {
+                    return `
+                    <div class="pt-2">
+                        <input type="text" value="${Security.sanitize(saved)}" oninput="examEngine.saveAnswer(${q.id}, this.value)" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 text-sm" placeholder="Ketik jawaban singkat di sini...">
+                    </div>`;
+                } else {
+                    return `
+                    <div class="pt-2">
+                        <textarea oninput="examEngine.saveAnswer(${q.id}, this.value)" rows="3" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 text-sm" placeholder="Tuliskan uraian penjelasan Anda...">${Security.sanitize(saved)}</textarea>
+                    </div>`;
+                }
+            },
+
+            confirmSubmit() {
+                if (confirm("Apakah Anda yakin ingin menyelesaikan dan mengirim jawaban ujian ini?")) {
+                    this.submitExam(false);
+                }
+            },
+
+            submitExam(isAuto) {
+                this.isExamActive = false;
+                clearInterval(this.timerInterval);
+                this.unbindSecurityEvents();
+
+                // Penilaian Otomatis (PG & Isian)
+                let totalScore = 0;
+                this.currentExam.questions.forEach(q => {
+                    const userAns = (this.answers[q.id] || '').toString().trim().toLowerCase();
+                    const keyAns = q.answer.toString().trim().toLowerCase();
+                    if (userAns === keyAns) {
+                        totalScore += q.score;
+                    }
+                });
+
+                const result = {
+                    examId: this.currentExam.id,
+                    username: app.currentUser.username,
+                    score: totalScore,
+                    status: isAuto ? 'Auto-Submit (Waktu Habis)' : 'Selesai',
+                    violations: this.violations,
+                    submittedAt: new Date().toLocaleString()
+                };
+
+                DB.saveResult(result);
+                localStorage.removeItem(`draft_${this.currentExam.id}_${app.currentUser.username}`);
+
+                // Keluar Fullscreen
+                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+
+                // Render Layar Selesai
+                this.renderFinishScreen(result);
+            },
+
+            renderFinishScreen(result) {
+                const container = document.getElementById('app-container');
+                container.innerHTML = `
+                <div class="max-w-md mx-auto bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center space-y-6 my-8 fade-in">
+                    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">Ujian Selesai!</h2>
+                        <p class="text-slate-500 text-sm mt-1">Jawaban Anda telah berhasil tersimpan di sistem.</p>
+                    </div>
+
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2 text-left">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500">Estimasi Nilai:</span>
+                            <span class="font-bold text-slate-800 text-sm">${result.score} / 100</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500">Total Pelanggaran Audit:</span>
+                            <span class="font-bold ${result.violations.length > 0 ? 'text-amber-600' : 'text-emerald-600'}">${result.violations.length} Log</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500">Waktu Terkirim:</span>
+                            <span class="font-mono text-slate-600">${result.submittedAt}</span>
+                        </div>
+                    </div>
+
+                    <button onclick="app.renderStudentHome()" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition">
+                        Kembali ke Halaman Utama
+                    </button>
+                </div>`;
+            }
+        };
+
+        // Inisialisasi Aplikasi saat dokumen siap
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
